@@ -4,22 +4,33 @@
 set -e -u -o pipefail
 
 declare -r LINUX_TXZ=latest-linux.tar.xz
+declare -r LINUX_CONFIG=kernel-config
 
 check_deps() {
 	declare -g -a -r DEPS=(
-		qemu-system-x86_64
+		xz-utils
+		make
+		gcc
+		libc-dev
+		flex
+		bison
+		libncurses-dev
+		qemu-system-x86
 		curl
 		sed
-		sleep
-		dirname
+		coreutils
 		tar
-		unlink
 	)
 	local dep
 
+	if ! type -t 'dpkg-query' >/dev/null 2>&1; then
+		printf 'Sorry, only debian-based distros are supported :(\n' >&2
+		return 1
+	fi
+
 	for dep in "${DEPS[@]}"; do
-		if ! type -t "$dep" >/dev/null 2>&1; then
-			printf '"%s" is missing\n' "$dep" >&2
+		if ! dpkg-query -W -f '${Status}\n' "$dep" >/dev/null 2>&1; then
+			printf 'Package "%s" is missing\n' "$dep" >&2
 			return 1
 		fi
 	done
@@ -53,10 +64,7 @@ do_action() {
 		elif test \( $c -eq 3 \) -o \( $c -eq 7 \); then
 			printf '\r\\'
 		fi
-		c=$(($c + 1))
-		if test $c -ge 8; then
-			c=0
-		fi
+		c=$((($c + 1) & 0x7))
 		sleep 1s
 	done
 	wait "$pid"
@@ -84,5 +92,15 @@ if test -z "$LINUX_LINK"; then
 fi
 printf '1: Downloading %s\n' "$LINUX_LINK"
 do_action "curl -s -H 'User-Agent:' -H 'Accept: application/x-xz' -o \"$LINUX_TXZ\" \"$LINUX_LINK\"" 'Fetching data...'
+
+tar -x -f "$LINUX_TXZ"
+shopt -s failglob
+cd linux-*
+(
+	make mrproper
+	cp "../../${LINUX_CONFIG}" .config
+	make olddefconfig
+	make "-j$(nproc)" all
+)
 
 exit 0
