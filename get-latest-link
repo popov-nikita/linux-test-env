@@ -1,0 +1,81 @@
+BEGIN {
+    if (!ENVIRON["URL"]) {
+        printf "Environ \"URL\" is not set...\n" > "/dev/stderr";
+        exit 1;
+    }
+
+    _HTTP_ONLY_RX = "^https?://";
+
+    _R = "href[ \t]*=[ \t]*\"[^\"]+\"";
+    _URL = ENVIRON["URL"];
+    _COMM = sprintf("curl -s -H 'User-Agent:' -H 'Accept: text/html' %s", _URL);
+    match(_URL, _HTTP_ONLY_RX);
+    if (RSTART == 0) {
+        printf "No scheme found in %s\n", _URL > "/dev/stderr";
+        exit 1;
+    }
+    _s = substr(_URL, RSTART, RLENGTH);
+    _h = substr(_URL, (RSTART + RLENGTH));
+    split(_h, _tmp_, "/");
+    _h = _tmp_["1"];
+    delete _tmp_;
+
+    while ((_COMM | getline _line) > 0) {
+        while (1) {
+            match(_line, _R);
+            if (RSTART == 0)
+                break;
+
+            _href = substr(_line, RSTART, RLENGTH);
+            split(_href, _tmp_, "\"");
+            _link = _tmp_["2"];
+            delete _tmp_;
+            _LINKS[_link] = 1;
+
+            _line = substr(_line, (RSTART + RLENGTH));
+        }
+    }
+
+    close(_COMM);
+
+    v1 = 0;
+    v2 = 0;
+    v3 = 0;
+    latest = "";
+    for (l in _LINKS) {
+        if (l ~ _HTTP_ONLY_RX) {
+            _link = l;
+        } else if (l ~ "^/") {
+            _link = sprintf("%s%s%s", _s, _h, l);
+        } else if (l !~ "://") {
+            _link = sprintf("%s%s", _URL, l);
+        } else {
+            printf "Unsupported URL %s\n", l > "/dev/stderr";
+            continue;
+        }
+
+        match(_link, "-[0-9]+\\.[0-9]+\\.[0-9]+\\.tar\\.(bz2|gz|xz)$");
+        if (RSTART == 0) {
+            printf "Skipping %s\n", _link > "/dev/stderr";
+            continue;
+        }
+        _version = substr(_link, RSTART, RLENGTH);
+        split(_version, _tmp_, "[\\.\\-]");
+        if ((_tmp_["2"] > v1) ||
+            (_tmp_["2"] == v1 && _tmp_["3"] > v2) ||
+            (_tmp_["2"] == v1 && _tmp_["3"] == v2 && _tmp_["4"] > v3)) {
+            v1 = _tmp_["2"];
+            v2 = _tmp_["3"];
+            v3 = _tmp_["4"];
+            latest = _link;
+        }
+        delete _tmp_;
+    }
+
+    if (latest) {
+        print latest;
+        fflush();
+    }
+
+    exit 0;
+}

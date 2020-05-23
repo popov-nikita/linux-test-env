@@ -3,8 +3,8 @@
 #set -x
 set -e -u -o pipefail
 
-declare -r LINUX_TXZ=latest-linux.tar.xz
-declare -r LINUX_CONFIG=kernel-config
+declare -r LINUX_TAR=latest-linux.tar.xz
+declare -r BUSYBOX_TAR=latest-busybox.tar.bz2
 
 check_deps() {
 	declare -g -a -r DEPS=(
@@ -17,7 +17,7 @@ check_deps() {
 		libncurses-dev
 		qemu-system-x86
 		curl
-		sed
+		mawk
 		coreutils
 		tar
 	)
@@ -34,12 +34,6 @@ check_deps() {
 			return 1
 		fi
 	done
-
-	return 0
-}
-
-get_linux_link() {
-	curl -s -H 'User-Agent:' -H 'Accept: text/html' https://www.kernel.org/ | sed -n -e '/<td[[:blank:]]*id[[:blank:]]*=[[:blank:]]*"latest_link"/,/<\/td>/s/^.*href="\([^"]\+\)".*$/\1/p'
 
 	return 0
 }
@@ -76,11 +70,27 @@ do_action() {
 
 check_deps
 
-cd "$(dirname "$0")/build-root"
+cd "$(dirname "$0")"
+declare -r AWK_SCRIPT="$(realpath get-latest-link)"
+
+get_linux_link() {
+	URL=https://www.kernel.org/ mawk -f "$AWK_SCRIPT" - 2>/dev/null
+	return 0
+}
+
+get_busybox_link() {
+	URL=https://busybox.net/downloads/ mawk -f "$AWK_SCRIPT" - 2>/dev/null
+	return 0
+}
+
+cd build-root/
 
 on_exit() {
-	if test -f "$LINUX_TXZ"; then
-		unlink "$LINUX_TXZ"
+	if test -f "$BUSYBOX_TAR"; then
+		unlink "$BUSYBOX_TAR"
+	fi
+	if test -f "$LINUX_TAR"; then
+		unlink "$LINUX_TAR"
 	fi
 }
 trap on_exit EXIT
@@ -91,16 +101,26 @@ if test -z "$LINUX_LINK"; then
 	exit 1
 fi
 printf '1: Downloading %s\n' "$LINUX_LINK"
-do_action "curl -s -H 'User-Agent:' -H 'Accept: application/x-xz' -o \"$LINUX_TXZ\" \"$LINUX_LINK\"" 'Fetching data...'
+do_action "curl -s -H 'User-Agent:' -H 'Accept: application/x-xz' -o \"$LINUX_TAR\" \"$LINUX_LINK\"" 'Fetching data...'
 
-tar -x -f "$LINUX_TXZ"
+declare -r BUSYBOX_LINK="$(get_busybox_link)"
+if test -z "$BUSYBOX_LINK"; then
+	printf "WARNING: https://busybox.net/downloads/ has been altered! Couldn't obtain download link\n" >&2
+	exit 1
+fi
+printf '2: Downloading %s\n' "$BUSYBOX_LINK"
+do_action "curl -s -H 'User-Agent:' -H 'Accept: application/x-bzip2' -o \"$BUSYBOX_TAR\" \"$BUSYBOX_LINK\"" 'Fetching data...'
+
 shopt -s failglob
-cd linux-*
-(
-	make mrproper
-	cp "../../${LINUX_CONFIG}" .config
-	make olddefconfig
-	make "-j$(nproc)" all
-)
+
+#printf '2: Compiling %s\n' "$LINUX_TAR"
+#(
+#	tar -x -f "$LINUX_TAR"
+#	cd linux-*
+#	make mrproper
+#	cp "../../kernel-config .config
+#	make olddefconfig
+#	make "-j$(nproc)" all
+#)
 
 exit 0
