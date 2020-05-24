@@ -117,12 +117,15 @@ do_action "curl -s -H 'User-Agent:' -H 'Accept: application/x-bzip2' -o \"$BUSYB
 shopt -s failglob
 
 printf '3: Preparing %s\n' "$LINUX_TAR"
-do_action "(tar -x -f \"$LINUX_TAR\";                 \
-            cd linux-*;                               \
-            make mrproper;                            \
-            cp ../../kernel-config .config;           \
-            make olddefconfig;                        \
-            make \"-j$(nproc)\" all) >/dev/null 2>&1" \
+do_action "(tar -x -f \"$LINUX_TAR\";                \
+            cd linux-*;                              \
+            make mrproper;                           \
+            cp ../../kernel-config .config;          \
+            make olddefconfig;                       \
+            make \"-j$(nproc)\" all;                 \
+            _bzimage_path=arch/x86_64/boot/bzImage;  \
+            cp -f -L -t .. \"\$_bzimage_path\";      \
+            unset -v _bzimage_path) >/dev/null 2>&1" \
           'Compiling kernel...'
 
 printf '4: Preparing %s\n' "$BUSYBOX_TAR"
