@@ -1,6 +1,6 @@
 #!/bin/bash
 
-set -x
+#set -x
 set -e -u -o pipefail
 
 declare -r LINUX_TAR=latest-linux.tar.xz
@@ -8,18 +8,21 @@ declare -r BUSYBOX_TAR=latest-busybox.tar.bz2
 
 check_deps() {
 	declare -g -a -r DEPS=(
-		xz-utils
-		make
-		gcc
-		libc-dev
-		flex
 		bison
-		libncurses-dev
-		qemu-system-x86
-		curl
-		mawk
 		coreutils
+		cpio
+		curl
+		findutils
+		flex
+		gcc
+		gzip
+		libc-dev
+		libncurses-dev
+		make
+		mawk
+		qemu-system-x86
 		tar
+		xz-utils
 	)
 	local dep
 
@@ -131,5 +134,22 @@ do_action "(tar -x -f \"$BUSYBOX_TAR\";      \
             make \"-j$(nproc)\" all;         \
             make install) >/dev/null 2>&1"   \
           'Compiling busybox...'
+
+printf '5: Packing initramfs.cpio.gz\n'
+cat <<-'EOF' >__init__
+#!/bin/sh
+mount -t proc none /proc
+mount -t sysfs none /sys
+
+exec /bin/sh
+EOF
+do_action "(cd busybox-*/_install;                              \
+            mkdir -p bin sbin etc proc sys usr/bin usr/sbin;    \
+            mv -T ../../__init__ ./init;                        \
+            chmod 755 init;                                     \
+            find . -print0 |                                    \
+            cpio --null -ov --format=newc |                     \
+            gzip -9 > ../../initramfs.cpio.gz) >/dev/null 2>&1" \
+          'Creating initramfs...'
 
 exit 0
