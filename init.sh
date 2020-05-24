@@ -1,6 +1,6 @@
 #!/bin/bash
 
-#set -x
+set -x
 set -e -u -o pipefail
 
 declare -r LINUX_TAR=latest-linux.tar.xz
@@ -113,14 +113,23 @@ do_action "curl -s -H 'User-Agent:' -H 'Accept: application/x-bzip2' -o \"$BUSYB
 
 shopt -s failglob
 
-#printf '2: Compiling %s\n' "$LINUX_TAR"
-#(
-#	tar -x -f "$LINUX_TAR"
-#	cd linux-*
-#	make mrproper
-#	cp "../../kernel-config .config
-#	make olddefconfig
-#	make "-j$(nproc)" all
-#)
+printf '3: Preparing %s\n' "$LINUX_TAR"
+do_action "(tar -x -f \"$LINUX_TAR\";                 \
+            cd linux-*;                               \
+            make mrproper;                            \
+            cp ../../kernel-config .config;           \
+            make olddefconfig;                        \
+            make \"-j$(nproc)\" all) >/dev/null 2>&1" \
+          'Compiling kernel...'
+
+printf '4: Preparing %s\n' "$BUSYBOX_TAR"
+do_action "(tar -x -f \"$BUSYBOX_TAR\";      \
+            cd busybox-*;                    \
+            make mrproper;                   \
+            cp ../../busybox-config .config; \
+            make silentoldconfig;            \
+            make \"-j$(nproc)\" all;         \
+            make install) >/dev/null 2>&1"   \
+          'Compiling busybox...'
 
 exit 0
