@@ -21,6 +21,7 @@ check_deps() {
 		make
 		mawk
 		qemu-system-x86
+                sed
 		tar
 		xz-utils
 	)
@@ -116,26 +117,40 @@ do_action "curl -s -H 'User-Agent:' -H 'Accept: application/x-bzip2' -o \"$BUSYB
 
 shopt -s failglob
 
+declare -r MK_INC_BASENAME='Makefile.inc'
+declare -r MK_INC_PATH="../../${MK_INC_BASENAME}"
+declare -r KBUILD_INC='./scripts/Kbuild.include'
+
 printf '3: Preparing %s\n' "$LINUX_TAR"
-do_action "(tar -x -f \"$LINUX_TAR\";                \
-            cd linux-*;                              \
-            make mrproper;                           \
-            cp ../../kernel-config .config;          \
-            make olddefconfig;                       \
-            make \"-j$(nproc)\" all;                 \
-            _bzimage_path=arch/x86_64/boot/bzImage;  \
-            cp -f -L -t .. \"\$_bzimage_path\";      \
-            unset -v _bzimage_path) >/dev/null 2>&1" \
+do_action "(tar -x -f \"${LINUX_TAR}\";                                  \
+            cd linux-*;                                                  \
+            ln -s -f \"${MK_INC_PATH}\" \".\";                           \
+            _this_mk_inc=\"\$(readlink -f \"${MK_INC_BASENAME}\")\";     \
+            sed -i.orig -e 's/if_changed/___tmp_\0/g' \"${KBUILD_INC}\"; \
+            sed -i -e \"\\\$ainclude \$_this_mk_inc\" \"${KBUILD_INC}\"; \
+            unset -v _this_mk_inc;                                       \
+            make mrproper;                                               \
+            cp ../../kernel-config .config;                              \
+            make olddefconfig;                                           \
+            make \"-j\$(nproc)\" all;                                    \
+            _bzimage_path=arch/x86_64/boot/bzImage;                      \
+            cp -f -L -t .. \"\$_bzimage_path\";                          \
+            unset -v _bzimage_path) >/dev/null 2>&1"                     \
           'Compiling kernel...'
 
 printf '4: Preparing %s\n' "$BUSYBOX_TAR"
-do_action "(tar -x -f \"$BUSYBOX_TAR\";      \
-            cd busybox-*;                    \
-            make mrproper;                   \
-            cp ../../busybox-config .config; \
-            make silentoldconfig;            \
-            make \"-j$(nproc)\" all;         \
-            make install) >/dev/null 2>&1"   \
+do_action "(tar -x -f \"${BUSYBOX_TAR}\";                                \
+            cd busybox-*;                                                \
+            ln -s -f \"${MK_INC_PATH}\" \".\";                           \
+            _this_mk_inc=\"\$(readlink -f \"${MK_INC_BASENAME}\")\";     \
+            sed -i.orig -e 's/if_changed/___tmp_\0/g' \"${KBUILD_INC}\"; \
+            sed -i -e \"\\\$ainclude \$_this_mk_inc\" \"${KBUILD_INC}\"; \
+            unset -v _this_mk_inc;                                       \
+            make mrproper;                                               \
+            cp ../../busybox-config .config;                             \
+            make silentoldconfig;                                        \
+            make \"-j\$(nproc)\" all;                                    \
+            make install) >/dev/null 2>&1"                               \
           'Compiling busybox...'
 
 printf '5: Packing initramfs.cpio.gz\n'
