@@ -8,6 +8,7 @@ declare -r BUSYBOX_TAR=latest-busybox.tar.bz2
 
 check_deps() {
 	declare -g -a -r DEPS=(
+		bc
 		bison
 		coreutils
 		cpio
@@ -21,7 +22,7 @@ check_deps() {
 		make
 		mawk
 		qemu-system-x86
-                sed
+		sed
 		tar
 		xz-utils
 	)
