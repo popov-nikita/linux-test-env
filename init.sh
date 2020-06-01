@@ -162,13 +162,16 @@ mount -t sysfs none /sys
 
 exec /bin/sh
 EOF
-do_action "(cd busybox-*/_install;                              \
-            mkdir -p bin sbin etc proc sys usr/bin usr/sbin;    \
-            mv -T ../../__init__ ./init;                        \
-            chmod 755 init;                                     \
-            find . -print0 |                                    \
-            cpio --null -ov --format=newc |                     \
-            gzip -9 > ../../initramfs.cpio.gz) >/dev/null 2>&1" \
+do_action "(cd busybox-*/_install;                                       \
+            mkdir -p bin sbin etc proc sys usr/bin usr/sbin usr/include; \
+            make -C ../../linux-* headers;                               \
+            cp -r ../../linux-*/usr/include/* usr/include;               \
+            find usr/include \( -name '.*' -o -name Makefile \) -delete; \
+            mv -T ../../__init__ ./init;                                 \
+            chmod 755 init;                                              \
+            find . -print0 |                                             \
+            cpio --null -ov --format=newc |                              \
+            gzip -9 > ../../initramfs.cpio.gz) >/dev/null 2>&1"          \
           'Creating initramfs...'
 
 exit 0
