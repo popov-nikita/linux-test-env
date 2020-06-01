@@ -154,21 +154,37 @@ do_action "(tar -x -f \"${BUSYBOX_TAR}\";                                \
             make install) >/dev/null 2>&1"                               \
           'Compiling busybox...'
 
+declare -r -a INITRAMFS_DIRS=(
+	bin
+	sbin
+	etc
+	proc
+	sys
+	usr/bin
+	usr/sbin
+	usr/include
+	usr/local/bin
+)
+
 printf '5: Packing initramfs.cpio.gz\n'
 cat <<-'EOF' >__init__
 #!/bin/sh
 mount -t proc none /proc
 mount -t sysfs none /sys
 
+PATH='/usr/local/bin:/bin:/sbin:/usr/bin:/usr/sbin'
+export PATH
+
 exec /bin/sh
 EOF
 do_action "(cd busybox-*/_install;                                       \
-            mkdir -p bin sbin etc proc sys usr/bin usr/sbin usr/include; \
+            mkdir -p ${INITRAMFS_DIRS[*]};                               \
             make -C ../../linux-* headers;                               \
             cp -r ../../linux-*/usr/include/* usr/include;               \
             find usr/include \( -name '.*' -o -name Makefile \) -delete; \
             mv -T ../../__init__ ./init;                                 \
             chmod 755 init;                                              \
+            make -C ../../../extensions \"R=\$(pwd)\" all;               \
             find . -print0 |                                             \
             cpio --null -ov --format=newc |                              \
             gzip -9 > ../../initramfs.cpio.gz) >/dev/null 2>&1"          \

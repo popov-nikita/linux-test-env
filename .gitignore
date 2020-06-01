@@ -1,2 +1,7 @@
 /build-root/*
 !/build-root/dummy.txt
+/extensions/reboot-util/*
+!/extensions/reboot-util/Makefile
+!/extensions/reboot-util/*.S
+!/extensions/reboot-util/*.c
+!/extensions/reboot-util/*.h
